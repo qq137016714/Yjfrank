@@ -1,0 +1,274 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  username      String    @unique
+  password      String
+  role          String    @default("editor") // "admin" | "editor"
+  isLocked      Boolean   @default(false)
+  loginAttempts Int       @default(0)
+  lockedUntil   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  uploads       ExcelUpload[]
+}
+
+// 每次上传的 EXCEL 文件记录
+model ExcelUpload {
+  id         String   @id @default(cuid())
+  filename   String
+  period     String   // 数据期次，如 "2026-W08"
+  rowCount   Int      @default(0)
+  uploadedBy String
+  uploader   User     @relation(fields: [uploadedBy], references: [id])
+  createdAt  DateTime @default(now())
+
+  task         UploadTask?
+  rows         ExcelRow[]
+  channelStats ChannelPeriodStat[]
+}
+
+// 异步处理任务状态
+model UploadTask {
+  id        String      @id @default(cuid())
+  uploadId  String      @unique
+  upload    ExcelUpload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  // pending | validating | parsing | done | error
+  status    String      @default("pending")
+  progress  Int         @default(0)
+  total     Int         @default(0)
+  message   String      @default("")
+  error     String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+// EXCEL 原始数据行（每行一条记录，用于后续匹配计算）
+model ExcelRow {
+  id                String      @id @default(cuid())
+  uploadId          String
+  upload            ExcelUpload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  rowIndex          Int
+
+  // A: 素材名（匹配用）
+  materialName      String
+  // B: 投放时间
+  deliveryDate      String?
+  // C: 广告渠道
+  channel           String?
+  // E: 总成本（加算）
+  totalCost         Float?
+  // G: 展示数（加算）
+  impressions       Float?
+  // I: 点击率（平均）
+  clickRate         Float?
+  // J: 3S完播率（平均）
+  playRate3s        Float?
+  // K: 完播率（平均）
+  playRate          Float?
+  // L: 转化率（平均）
+  conversionRate    Float?
+  // N: 点击数（加算）
+  clicks            Float?
+  // P: 获客数（加算）
+  customers         Float?
+  // Q: 低价课人数（加算）
+  lowCourseCount    Float?
+  // R: 落地页转化率（平均）
+  landingConvRate   Float?
+  // S: 低价课流水（加算）
+  lowCourseRevenue  Float?
+  // T: 公众号关注人数（加算）
+  wechatFollowers   Float?
+  // U: 公众号关注率（平均）
+  wechatFollowRate  Float?
+  // V: 激活人数（加算）
+  activations       Float?
+  // W: 激活率（平均）
+  activationRate    Float?
+  // Y: 添加人数（加算）
+  additions         Float?
+  // Z: 添加率（平均）
+  additionRate      Float?
+  // AB: 进群人数（加算）
+  groupJoins        Float?
+  // AC: 进群率（平均）
+  groupJoinRate     Float?
+  // AD: 第一天到播率（平均）
+  day1PlayRate      Float?
+  // AE: 第二天到播率（平均）
+  day2PlayRate      Float?
+  // AF: 第三天到播率（平均）
+  day3PlayRate      Float?
+  // AG: 第四天到播率（平均）
+  day4PlayRate      Float?
+  // AH: 第五天到播率（平均）
+  day5PlayRate      Float?
+  // AI: 高沉浸用户数（加算）
+  deepUsers         Float?
+  // AJ: 高沉浸率（平均）
+  deepRate          Float?
+  // AK: 第三天高沉浸到播率（平均）
+  day3DeepPlayRate  Float?
+  // AL: 第三天高沉浸转化率（平均）
+  day3DeepConvRate  Float?
+  // AM: 高价课人数（加算）
+  highCourseCount   Float?
+  // AN: 高价课支付率（平均）
+  highCoursePayRate Float?
+  // AO: 第三天高价课人数（加算）
+  day3HighCourse    Float?
+  // AP: 第四天高价课人数（加算）
+  day4HighCourse    Float?
+  // AQ: 第五天高价课人数（加算）
+  day5HighCourse    Float?
+  // AR: 高价课流水（加算）
+  highCourseRevenue Float?
+  // AS: 退款人数（加算）
+  refunds           Float?
+  // AT: 退款率（平均）
+  refundRate        Float?
+
+  createdAt         DateTime    @default(now())
+}
+
+// 脚本基础版（v0.3 仅 name，v1.1 完善全字段）
+model Script {
+  id        String      @id @default(cuid())
+  name      String      @unique
+  createdAt DateTime    @default(now())
+
+  stat         ScriptStat?
+  channelStats ScriptChannelStat[]
+}
+
+// 每个脚本的聚合统计（全量重算，跨所有期次）
+model ScriptStat {
+  id        String   @id @default(cuid())
+  scriptId  String   @unique
+  script    Script   @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+
+  matchedRows  Int @default(0)  // 匹配到的原始行数
+  uploadCount  Int @default(0)  // 参与计算的期数
+
+  // 加算字段
+  totalCost         Float @default(0)
+  impressions       Float @default(0)
+  clicks            Float @default(0)
+  customers         Float @default(0)
+  lowCourseCount    Float @default(0)
+  lowCourseRevenue  Float @default(0)
+  wechatFollowers   Float @default(0)
+  activations       Float @default(0)
+  additions         Float @default(0)
+  groupJoins        Float @default(0)
+  deepUsers         Float @default(0)
+  highCourseCount   Float @default(0)
+  day3HighCourse    Float @default(0)
+  day4HighCourse    Float @default(0)
+  day5HighCourse    Float @default(0)
+  highCourseRevenue Float @default(0)
+  refunds           Float @default(0)
+
+  // 平均字段（无数据时为 null）
+  clickRate         Float?
+  playRate3s        Float?
+  playRate          Float?
+  conversionRate    Float?
+  landingConvRate   Float?
+  wechatFollowRate  Float?
+  activationRate    Float?
+  additionRate      Float?
+  groupJoinRate     Float?
+  day1PlayRate      Float?
+  day2PlayRate      Float?
+  day3PlayRate      Float?
+  day4PlayRate      Float?
+  day5PlayRate      Float?
+  deepRate          Float?
+  day3DeepPlayRate  Float?
+  day3DeepConvRate  Float?
+  highCoursePayRate Float?
+  refundRate        Float?
+
+  // 重算字段
+  customerCost      Float?  // 获客成本 = totalCost ÷ customers
+  avgImpressionCost Float?  // 平均展示消耗 = totalCost ÷ impressions
+  avgClickCost      Float?  // 平均点击消耗 = totalCost ÷ clicks
+  activationCost    Float?  // 激活成本 = totalCost ÷ activations
+  additionCost      Float?  // 添加成本 = totalCost ÷ additions
+  roi               Float?  // ROI = highCourseRevenue ÷ totalCost
+
+  updatedAt DateTime @updatedAt
+}
+
+// 按渠道分组的脚本统计（v1.0 新增）
+model ScriptChannelStat {
+  id        String @id @default(cuid())
+  scriptId  String
+  script    Script @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+  channel   String
+
+  matchedRows       Int   @default(0)
+  totalCost         Float @default(0)
+  impressions       Float @default(0)
+  clicks            Float @default(0)
+  customers         Float @default(0)
+  highCourseRevenue Float @default(0)
+  lowCourseRevenue  Float @default(0)
+  activations       Float @default(0)
+  additions         Float @default(0)
+  highCourseCount   Float @default(0)
+  refunds           Float @default(0)
+
+  clickRate         Float?
+  playRate3s        Float?
+  playRate          Float?
+  conversionRate    Float?
+  customerCost      Float?
+  roi               Float?
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([scriptId, channel])
+}
+
+// 渠道×期次统计（独立于脚本匹配，动态识别渠道）
+model ChannelPeriodStat {
+  id       String      @id @default(cuid())
+  channel  String
+  uploadId String
+  upload   ExcelUpload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  period   String      // 冗余存储，方便查询
+
+  rowCount          Int   @default(0)
+  totalCost         Float @default(0)
+  impressions       Float @default(0)
+  clicks            Float @default(0)
+  customers         Float @default(0)
+  highCourseRevenue Float @default(0)
+  lowCourseRevenue  Float @default(0)
+  activations       Float @default(0)
+  additions         Float @default(0)
+  highCourseCount   Float @default(0)
+  refunds           Float @default(0)
+
+  clickRate         Float?
+  playRate3s        Float?
+  playRate          Float?
+  conversionRate    Float?
+  customerCost      Float?
+  roi               Float?
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([channel, uploadId])
+}
