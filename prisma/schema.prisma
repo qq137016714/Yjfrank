@@ -19,6 +19,7 @@ model User {
   updatedAt     DateTime  @updatedAt
 
   uploads       ExcelUpload[]
+  scripts       Script[]
 }
 
 // 每次上传的 EXCEL 文件记录
@@ -140,14 +141,39 @@ model ExcelRow {
   createdAt         DateTime    @default(now())
 }
 
-// 脚本基础版（v0.3 仅 name，v1.1 完善全字段）
+// 脚本完整版（v1.1）
 model Script {
-  id        String      @id @default(cuid())
-  name      String      @unique
-  createdAt DateTime    @default(now())
+  id           String   @id @default(cuid())
+  name         String   @unique
 
+  // 内容字段
+  frontContent String?  // 前贴内容
+  midContent   String?  // 中段内容
+  endContent   String?  // 尾贴内容
+
+  // 父子关系（衍生脚本）
+  parentId     String?
+  parent       Script?  @relation("ScriptChildren", fields: [parentId], references: [id])
+  children     Script[] @relation("ScriptChildren")
+
+  // 上传者（nullable 兼容 v0.3 旧数据）
+  uploadedBy   String?
+  uploader     User?    @relation(fields: [uploadedBy], references: [id])
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tags         Tag[]
   stat         ScriptStat?
   channelStats ScriptChannelStat[]
+}
+
+// 标签（前/中/尾贴）
+model Tag {
+  id      String   @id @default(cuid())
+  name    String   @unique
+  type    String   // "front" | "mid" | "end"
+  scripts Script[]
 }
 
 // 每个脚本的聚合统计（全量重算，跨所有期次）
