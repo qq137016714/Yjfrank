@@ -9,6 +9,8 @@ import KpiCards from '@/components/dashboard/KpiCards'
 import Top10Charts from '@/components/dashboard/Top10Charts'
 import ChannelCharts from '@/components/dashboard/ChannelCharts'
 import SmartSummary from '@/components/dashboard/SmartSummary'
+import ScriptInsights from '@/components/dashboard/ScriptInsights'
+import PeriodSelector from '@/components/dashboard/PeriodSelector'
 import ScriptManager from '@/components/dashboard/ScriptManager'
 import ScriptSearch from '@/components/dashboard/ScriptSearch'
 import { BarChart3, PieChart } from 'lucide-react'
@@ -20,6 +22,7 @@ export default function DashboardPage() {
   const isAdmin = session?.user?.role === 'admin'
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [chartTab, setChartTab] = useState<ChartTab>('top10')
+  const [selectedUploadId, setSelectedUploadId] = useState<string | null>(null)
 
   const refresh = () => setRefreshTrigger(n => n + 1)
 
@@ -28,13 +31,21 @@ export default function DashboardPage() {
       <Navbar />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">数据分析</h1>
-          <p className="text-sm text-gray-500 mt-1">上传 EXCEL 数据，查看脚本投放效果分析</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">数据分析</h1>
+            <p className="text-sm text-gray-500 mt-1">上传 EXCEL 数据，查看脚本投放效果分析</p>
+          </div>
+          <PeriodSelector
+            value={selectedUploadId}
+            onChange={setSelectedUploadId}
+            refreshTrigger={refreshTrigger}
+          />
         </div>
 
-        <KpiCards refreshTrigger={refreshTrigger} />
-        <SmartSummary refreshTrigger={refreshTrigger} />
+        <KpiCards refreshTrigger={refreshTrigger} uploadId={selectedUploadId} />
+        <SmartSummary refreshTrigger={refreshTrigger} uploadId={selectedUploadId} />
+        <ScriptInsights refreshTrigger={refreshTrigger} />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* 左侧：图表区 */}
@@ -55,7 +66,7 @@ export default function DashboardPage() {
               </div>
 
               {chartTab === 'top10'
-                ? <Top10Charts refreshTrigger={refreshTrigger} />
+                ? <Top10Charts refreshTrigger={refreshTrigger} uploadId={selectedUploadId} />
                 : <ChannelCharts refreshTrigger={refreshTrigger} />
               }
             </div>

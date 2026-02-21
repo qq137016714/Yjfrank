@@ -19,9 +19,10 @@ export async function GET(
     include: {
       tags: true,
       stat: true,
-      uploader: { select: { username: true } },
+      channelStats: { orderBy: { totalCost: 'desc' } },
+      uploader: { select: { id: true, username: true } },
       parent: { select: { id: true, name: true } },
-      children: { select: { id: true, name: true } },
+      children: { select: { id: true, name: true }, orderBy: { createdAt: 'asc' } },
     },
   })
 

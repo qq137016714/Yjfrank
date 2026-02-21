@@ -16,19 +16,21 @@ interface StatsData {
 
 interface KpiCardsProps {
   refreshTrigger?: number
+  uploadId?: string | null
 }
 
 const fmt = (n: number) =>
   n >= 10000 ? `${(n / 10000).toFixed(2)}万` : n.toFixed(2)
 
-export default function KpiCards({ refreshTrigger }: KpiCardsProps) {
+export default function KpiCards({ refreshTrigger, uploadId }: KpiCardsProps) {
   const [data, setData] = useState<StatsData | null>(null)
 
   const load = useCallback(async () => {
-    const res = await fetch('/api/stats')
+    const url = uploadId ? `/api/stats?uploadId=${uploadId}` : '/api/stats'
+    const res = await fetch(url)
     const json = await res.json()
     if (json.success) setData(json.data)
-  }, [])
+  }, [uploadId])
 
   useEffect(() => { load() }, [load, refreshTrigger])
 

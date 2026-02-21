@@ -1,5 +1,68 @@
 # 信息流平台 开发进度追踪
 
+---
+
+## 🚀 QUICK START TIPS（新会话必读，节省 token）
+
+### 项目状态：v2.0 已完成，下次从 v3.0 开始
+
+### 技术栈
+- **框架**：Next.js 16 (App Router) + TypeScript
+- **数据库**：Prisma 6 + SQLite（`prisma/dev.db`）
+- **认证**：NextAuth.js v5（JWT，无 adapter）
+- **UI**：Tailwind CSS v4 + Recharts
+- **运行**：`npm run dev`（开发）/ `npx next build`（验证编译）
+
+### 关键路径
+| 路由 | 说明 |
+|------|------|
+| `/dashboard` | 数据分析主页（KPI/图表/渠道/脚本洞察） |
+| `/scripts` | 脚本管理页（列表/筛选/详情/对比） |
+| `/login` `/register` | 认证页 |
+
+### 已完成功能一览（v0.1 ~ v2.0）
+- **账号系统**：登录/注册/角色（admin/editor）/锁定机制
+- **EXCEL 上传**：异步解析、进度轮询、历史记录、模板下载
+- **数据匹配**：脚本名模糊匹配 + 边界保护（`lib/matching.ts`）
+- **统计计算**：多期聚合（加算/平均/重算）、渠道×期次矩阵（`lib/stats.ts`）
+- **数据看板**：KPI 卡片、TOP10 图表（消耗/获客/ROI）、渠道分析、期次筛选器、最佳源脚本/迭代脚本洞察
+- **脚本管理**：完整 CRUD、标签多选（前/中/尾贴）、父子关系、搜索筛选、投放数据 Tab、多脚本对比
+
+### 核心数据模型（Prisma）
+```
+User → ExcelUpload → ExcelRow（原始数据）
+Script ↔ Tag（多对多）
+Script → ScriptStat（全期聚合）
+Script → ScriptChannelStat（按渠道聚合）
+ExcelUpload → ChannelPeriodStat（渠道×期次）
+Script → Script（父子自关联，parentId）
+```
+
+### 关键 API
+| 端点 | 说明 |
+|------|------|
+| `GET /api/stats?uploadId=xxx` | KPI 汇总（全期或单期） |
+| `GET /api/stats/channel` | 渠道分析 |
+| `GET /api/scripts?tags=x,y&hasData=true` | 脚本列表（支持筛选） |
+| `GET /api/scripts/[id]` | 脚本详情（含 channelStats） |
+| `GET /api/scripts/compare?ids=a,b,c` | 多脚本对比 |
+| `GET /api/excel/history` | 上传历史（含 period 字段） |
+
+### 重要约定
+- 脚本名全平台唯一（`Script.name` unique）
+- 管理员账号：`管理员 / 123456`
+- 期次编号：按 `ExcelUpload.createdAt` 升序，第1期 = 最早上传
+- 渠道过滤：`isValidChannel()` 过滤 null / "" / "-" / "—" / "合计" / "total"
+- 数据行过滤：`isDataRow()` 过滤 "合计" / "total" / 空 materialName
+
+### 下次开始前执行
+```bash
+npm run dev          # 确认服务正常启动
+npx next build       # 确认无 TypeScript 错误
+```
+
+---
+
 ## v0.1 — 项目基础架构 + 账号系统 ✅ 已验收
 
 ### 架构初始化
@@ -199,39 +262,78 @@
 
 ---
 
-## v1.1 — 脚本管理基础版（开发中）
+## v1.1 — 脚本管理基础版 ✅ 已验收
 
 ### 后端开发
-- [ ] 完善 Prisma schema（Script 全字段：内容/标签/父子关系/上传者）
-- [ ] 新增 Tag 模型（前/中/尾贴标签，多对多关联）
-- [ ] 数据库迁移（v1.1）
-- [ ] 更新 prisma/seed.ts（写入完整标签初始数据）
-- [ ] 更新 POST /api/scripts（全字段创建，任意登录用户可用）
-- [ ] 新增 GET /api/scripts/check-name（脚本名唯一性校验）
-- [ ] 新增 GET /api/scripts/[id]（单脚本详情）
-- [ ] 新增 PUT /api/scripts/[id]（编辑，本人/管理员）
-- [ ] 更新 DELETE /api/scripts/[id]（仅管理员，级联删除）
-- [ ] 新增 GET /api/tags（标签列表）
+- [x] 完善 Prisma schema（Script 全字段：内容/标签/父子关系/上传者）
+- [x] 新增 Tag 模型（前/中/尾贴标签，多对多关联）
+- [x] 数据库迁移（v1.1）
+- [x] 更新 prisma/seed.ts（写入完整标签初始数据）
+- [x] 更新 POST /api/scripts（全字段创建，任意登录用户可用）
+- [x] 新增 GET /api/scripts/check-name（脚本名唯一性校验）
+- [x] 新增 GET /api/scripts/[id]（单脚本详情）
+- [x] 新增 PUT /api/scripts/[id]（编辑，本人/管理员）
+- [x] 更新 DELETE /api/scripts/[id]（仅管理员，级联删除）
+- [x] 新增 GET /api/tags（标签列表）
 
 ### 前端开发
-- [ ] 实现脚本管理页 /scripts（列表 + 搜索筛选）
-- [ ] 实现脚本上传表单弹窗（标签多选、衍生脚本字段动态显示）
-- [ ] 实现脚本详情弹窗（只读，含标签/父子关系展示）
-- [ ] 实现权限控制（编辑仅本人/管理员，删除仅管理员）
-- [ ] 实现「以此脚本迭代」按钮（所有人可见，预填父脚本）
-- [ ] 更新导航栏（脚本管理高亮）
-
-### 验收标准
-- [ ] 编导可填写完整表单并上传脚本
-- [ ] 脚本名重复时前端实时报错，不可提交
-- [ ] 标签多选正常，已选标签以 Tag 形式展示
-- [ ] 选「是」时衍生脚本字段动态展示
-- [ ] 脚本列表正常展示，搜索筛选功能正常
-- [ ] 编导无法看到他人脚本的编辑按钮
-- [ ] 所有人可以看到「以此脚本迭代」按钮
-- [ ] 管理员可删除任意脚本（二次确认）
+- [x] 实现脚本管理页 /scripts（列表 + 搜索筛选）
+- [x] 实现脚本上传表单弹窗（标签多选、衍生脚本字段动态显示）
+- [x] 实现父脚本搜索选择器（替换下拉框，支持实时检索）
+- [x] 实现脚本详情弹窗（只读，含标签/父子关系展示）
+- [x] 实现权限控制（编辑仅本人/管理员，删除仅管理员）
+- [x] 实现「以此脚本迭代」按钮（所有人可见，预填父脚本）
+- [x] 更新导航栏（脚本管理高亮）
 
 ---
 
-## v2.0 — 脚本管理完整版 + 数据关联（待开始）
-## v3.0 — AI二创页完整版（待开始）
+## v2.0 — 脚本管理完整版 + 数据关联 ✅ 已完成
+
+### 完成内容
+- [x] GET /api/scripts 增加 tags/hasData 筛选参数
+- [x] GET /api/scripts/[id] 返回完整 stat + channelStats + 父子关系
+- [x] GET /api/scripts/compare?ids=a,b,c（多脚本横向对比）
+- [x] GET /api/stats 增加 topSourceScripts + topIterationScripts（源脚本递归聚合获客）
+- [x] GET /api/stats?uploadId=xxx 支持单期数据过滤（从 ExcelRow 实时计算）
+- [x] 脚本列表标签筛选栏（前/中/尾贴分组，多选）+ 「有数据」快速过滤
+- [x] 脚本详情弹窗：「脚本信息」+「投放数据」Tab，含渠道明细表
+- [x] 脚本对比功能（最多4条，指标高亮最优值 ★，渠道消耗分布）
+- [x] 数据看板期次筛选器（PeriodSelector，可搜索，选中后 KPI/TOP10/摘要联动）
+- [x] 最佳源脚本（含迭代递归聚合，按总获客排序）+ 最佳迭代脚本（按 ROI）
+- [x] 修复 SmartSummary 脚本名截断问题（移除 max-w-[120px]）
+- [x] 移除首页 ScriptManager 快速添加入口（绕过表单校验的漏洞）
+- [x] 修复对比弹窗获客成本未计算（avgCustomerCost 为计算字段，在 API 补算）
+
+---
+
+## v3.0 — AI 二创页完整版（待开始）
+
+### 目标
+编导可在 AI 二创页基于已有脚本生成新脚本变体，支持选择源脚本、填写改写方向、
+调用 AI 生成前/中/尾贴内容，生成后可直接保存为新脚本（自动关联父脚本）。
+
+### 后端开发
+- [ ] 集成 AI 接口（Claude API 或 OpenAI，通过 `NEXT_PUBLIC_AI_PROVIDER` 环境变量切换）
+- [ ] 实现 POST /api/ai/generate（接收源脚本内容 + 改写指令，流式返回生成结果）
+- [ ] 实现 POST /api/ai/save（将生成结果直接保存为新脚本，自动设置 parentId）
+- [ ] 生成历史记录表（AiGeneration：prompt、result、scriptId、createdBy）
+- [ ] 数据库迁移（v3.0）
+
+### 前端开发
+- [ ] 实现 AI 二创页 /ai-create（导航已预留入口）
+- [ ] 源脚本选择器（复用 PeriodSelector 风格的搜索下拉）
+- [ ] 改写方向输入（文本框 + 预设快捷指令按钮，如「加强情感共鸣」「缩短前贴」）
+- [ ] 流式生成展示（前/中/尾贴分区实时显示，打字机效果）
+- [ ] 生成结果编辑（可在生成后手动微调）
+- [ ] 一键保存为新脚本（自动填充父脚本、标签继承）
+- [ ] 生成历史列表（可查看历史生成记录，重新加载某次结果）
+
+### 验收标准
+- [ ] 选择源脚本后，源脚本内容自动填入参考区
+- [ ] 输入改写方向后点击生成，前/中/尾贴内容流式输出
+- [ ] 生成过程中可中断
+- [ ] 生成完成后可编辑内容
+- [ ] 点击「保存为新脚本」弹出表单（名称预填、父脚本已选、内容已填）
+- [ ] 生成历史可查看，可重新加载某次结果继续编辑
+
+---

@@ -4,13 +4,22 @@ import { prisma } from '@/lib/db'
 import { recalculateAllStats } from '@/lib/stats'
 import type { ApiResponse } from '@/types'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const session = await auth()
   if (!session) {
     return NextResponse.json<ApiResponse>({ success: false, message: '请先登录' }, { status: 401 })
   }
 
+  const { searchParams } = new URL(request.url)
+  const tagsParam = searchParams.get('tags')
+  const hasData   = searchParams.get('hasData') === 'true'
+  const tagIds    = tagsParam ? tagsParam.split(',').filter(Boolean) : []
+
   const scripts = await prisma.script.findMany({
+    where: {
+      ...(tagIds.length > 0 ? { tags: { some: { id: { in: tagIds } } } } : {}),
+      ...(hasData ? { stat: { matchedRows: { gt: 0 } } } : {}),
+    },
     orderBy: { createdAt: 'desc' },
     include: {
       tags: true,

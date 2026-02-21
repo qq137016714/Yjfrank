@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Trash2, Loader2, FileText } from 'lucide-react'
+import { Trash2, Loader2, FileText } from 'lucide-react'
 
 interface Script {
   id: string
@@ -17,10 +17,7 @@ interface ScriptManagerProps {
 export default function ScriptManager({ isAdmin, onChanged }: ScriptManagerProps) {
   const [scripts, setScripts] = useState<Script[]>([])
   const [loading, setLoading] = useState(true)
-  const [newName, setNewName] = useState('')
-  const [adding, setAdding] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [error, setError] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -31,26 +28,6 @@ export default function ScriptManager({ isAdmin, onChanged }: ScriptManagerProps
   }, [])
 
   useEffect(() => { load() }, [load])
-
-  const handleAdd = async () => {
-    if (!newName.trim()) return
-    setAdding(true)
-    setError('')
-    const res = await fetch('/api/scripts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newName.trim() }),
-    })
-    const json = await res.json()
-    if (json.success) {
-      setNewName('')
-      await load()
-      onChanged?.()
-    } else {
-      setError(json.message)
-    }
-    setAdding(false)
-  }
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`确认删除脚本「${name}」？相关统计数据也将清除。`)) return
@@ -63,29 +40,6 @@ export default function ScriptManager({ isAdmin, onChanged }: ScriptManagerProps
 
   return (
     <div className="space-y-3">
-      {isAdmin && (
-        <div className="space-y-1">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={newName}
-              onChange={e => { setNewName(e.target.value); setError('') }}
-              onKeyDown={e => e.key === 'Enter' && handleAdd()}
-              placeholder="输入脚本名，回车添加"
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <button
-              onClick={handleAdd}
-              disabled={adding || !newName.trim()}
-              className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
-            >
-              {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-            </button>
-          </div>
-          {error && <p className="text-xs text-red-500">{error}</p>}
-        </div>
-      )}
-
       {loading ? (
         <div className="flex justify-center py-4 text-gray-400">
           <Loader2 className="w-4 h-4 animate-spin" />

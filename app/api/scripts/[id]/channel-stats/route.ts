@@ -13,10 +13,9 @@ export async function GET(
   }
 
   const { id } = await params
-  const decodedName = decodeURIComponent(id)
 
   const script = await prisma.script.findUnique({
-    where: { name: decodedName },
+    where: { id },
     include: { channelStats: { orderBy: { totalCost: 'desc' } } },
   })
 

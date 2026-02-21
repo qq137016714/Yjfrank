@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Search, Plus, Trash2, Loader2, FileText, GitBranch } from 'lucide-react'
+import { Search, Plus, Trash2, Loader2, FileText, GitBranch, SlidersHorizontal } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import ScriptForm from './ScriptForm'
 import ScriptDetail from './ScriptDetail'
+import ScriptCompare from './ScriptCompare'
 
 interface Tag { id: string; name: string; type: string }
 interface Script {
@@ -24,6 +25,11 @@ const TYPE_COLOR: Record<string, string> = {
   mid:   'bg-purple-100 text-purple-700',
   end:   'bg-green-100 text-green-700',
 }
+const TYPE_ACTIVE: Record<string, string> = {
+  front: 'bg-blue-600 text-white border-blue-600',
+  mid:   'bg-purple-600 text-white border-purple-600',
+  end:   'bg-green-600 text-white border-green-600',
+}
 const money = (v: number) => v >= 10000 ? `¥${(v / 10000).toFixed(1)}万` : `¥${v.toFixed(0)}`
 
 export default function ScriptList() {
@@ -32,13 +38,19 @@ export default function ScriptList() {
   const userId = session?.user?.id
 
   const [scripts, setScripts] = useState<Script[]>([])
+  const [allTags, setAllTags] = useState<Tag[]>([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
+  const [filterTagIds, setFilterTagIds] = useState<string[]>([])
+  const [hasDataOnly, setHasDataOnly] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [editScript, setEditScript] = useState<Script | null>(null)
   const [detailScript, setDetailScript] = useState<Script | null>(null)
   const [iterateFrom, setIterateFrom] = useState<{ id: string; name: string } | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [compareIds, setCompareIds] = useState<string[]>([])
+  const [showCompare, setShowCompare] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -48,7 +60,10 @@ export default function ScriptList() {
     setLoading(false)
   }, [])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+    fetch('/api/tags').then(r => r.json()).then(j => { if (j.success) setAllTags(j.data) })
+  }, [load])
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`确认删除脚本「${name}」？此操作不可恢复。`)) return
@@ -65,9 +80,26 @@ export default function ScriptList() {
     setShowForm(true)
   }
 
-  const filtered = scripts.filter(s =>
-    !query || s.name.toLowerCase().includes(query.toLowerCase())
-  )
+  const toggleFilterTag = (id: string) =>
+    setFilterTagIds(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id])
+
+  const toggleCompare = (id: string) =>
+    setCompareIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : prev.length < 4 ? [...prev, id] : prev)
+
+  const filtered = scripts.filter(s => {
+    if (query && !s.name.toLowerCase().includes(query.toLowerCase())) return false
+    if (hasDataOnly && (!s.stat || s.stat.matchedRows === 0)) return false
+    if (filterTagIds.length > 0 && !filterTagIds.some(tid => s.tags.some(t => t.id === tid))) return false
+    return true
+  })
+
+  const tagsByType = ['front', 'mid', 'end'].map(type => ({
+    type,
+    label: type === 'front' ? '前贴' : type === 'mid' ? '中段' : '尾贴',
+    tags: allTags.filter(t => t.type === type),
+  }))
+
+  const activeFilterCount = filterTagIds.length + (hasDataOnly ? 1 : 0)
 
   return (
     <div className="space-y-4">
@@ -79,11 +111,66 @@ export default function ScriptList() {
             placeholder="搜索脚本名..."
             className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
         </div>
+        <button onClick={() => setShowFilters(!showFilters)}
+          className={`flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm transition-colors ${
+            activeFilterCount > 0 ? 'border-blue-500 text-blue-600 bg-blue-50' : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+          }`}>
+          <SlidersHorizontal className="w-4 h-4" />
+          筛选{activeFilterCount > 0 ? `(${activeFilterCount})` : ''}
+        </button>
         <button onClick={() => { setEditScript(null); setIterateFrom(null); setShowForm(true) }}
           className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
           <Plus className="w-4 h-4" />上传脚本
         </button>
       </div>
+
+      {/* 筛选面板 */}
+      {showFilters && (
+        <div className="border border-gray-200 rounded-xl p-4 space-y-3 bg-gray-50">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-gray-500 font-medium w-10 shrink-0">快速</span>
+            <button onClick={() => setHasDataOnly(!hasDataOnly)}
+              className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                hasDataOnly ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+              }`}>
+              有投放数据
+            </button>
+            {activeFilterCount > 0 && (
+              <button onClick={() => { setFilterTagIds([]); setHasDataOnly(false) }}
+                className="px-3 py-1 rounded-full text-xs text-red-500 border border-red-200 hover:bg-red-50">
+                清除筛选
+              </button>
+            )}
+          </div>
+          {tagsByType.map(({ type, label, tags }) => tags.length > 0 && (
+            <div key={type} className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-gray-500 font-medium w-10 shrink-0">{label}</span>
+              {tags.map(tag => (
+                <button key={tag.id} onClick={() => toggleFilterTag(tag.id)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                    filterTagIds.includes(tag.id) ? TYPE_ACTIVE[type] : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+                  }`}>
+                  {tag.name}
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 对比栏 */}
+      {compareIds.length > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-sm">
+          <span className="text-amber-700 font-medium">已选 {compareIds.length} 条脚本对比</span>
+          <span className="text-amber-500 text-xs">（最多4条）</span>
+          <div className="flex-1" />
+          <button onClick={() => setCompareIds([])} className="text-amber-500 hover:text-amber-700 text-xs">清除</button>
+          <button onClick={() => setShowCompare(true)}
+            className="px-3 py-1 bg-amber-500 text-white rounded-lg text-xs font-medium hover:bg-amber-600">
+            开始对比
+          </button>
+        </div>
+      )}
 
       {/* 列表 */}
       {loading ? (
@@ -91,13 +178,15 @@ export default function ScriptList() {
       ) : filtered.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
           <FileText className="w-12 h-12 mx-auto mb-3 opacity-30" />
-          <p>{query ? '没有匹配的脚本' : '暂无脚本，点击「上传脚本」开始'}</p>
+          <p>{query || activeFilterCount > 0 ? '没有匹配的脚本' : '暂无脚本，点击「上传脚本」开始'}</p>
         </div>
       ) : (
         <div className="space-y-2">
           {filtered.map(script => (
             <div key={script.id}
-              className="border rounded-xl p-4 hover:bg-gray-50 cursor-pointer transition-colors"
+              className={`border rounded-xl p-4 hover:bg-gray-50 cursor-pointer transition-colors ${
+                compareIds.includes(script.id) ? 'border-amber-400 bg-amber-50' : ''
+              }`}
               onClick={() => setDetailScript(script)}>
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
@@ -113,7 +202,6 @@ export default function ScriptList() {
                     )}
                   </div>
 
-                  {/* 标签 */}
                   {script.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-2">
                       {script.tags.slice(0, 5).map(tag => (
@@ -136,8 +224,16 @@ export default function ScriptList() {
                   </div>
                 </div>
 
-                {/* 操作按钮 */}
                 <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                  <button onClick={() => toggleCompare(script.id)}
+                    title="加入对比"
+                    className={`px-2 py-1 text-xs rounded transition-colors ${
+                      compareIds.includes(script.id)
+                        ? 'text-amber-600 bg-amber-100'
+                        : 'text-gray-400 hover:text-amber-500 hover:bg-amber-50'
+                    }`}>
+                    对比
+                  </button>
                   {(isAdmin || script.uploader?.id === userId) && (
                     <button onClick={() => { setEditScript(script); setIterateFrom(null); setShowForm(true) }}
                       className="px-2 py-1 text-xs text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded">
@@ -160,7 +256,6 @@ export default function ScriptList() {
         </div>
       )}
 
-      {/* 表单弹窗 */}
       {showForm && (
         <ScriptForm
           onClose={() => { setShowForm(false); setEditScript(null); setIterateFrom(null) }}
@@ -170,15 +265,18 @@ export default function ScriptList() {
         />
       )}
 
-      {/* 详情弹窗 */}
       {detailScript && (
         <ScriptDetail
-          script={detailScript}
+          scriptId={detailScript.id}
           onClose={() => setDetailScript(null)}
           canEdit={isAdmin || detailScript.uploader?.id === userId}
           onEdit={() => { setEditScript(detailScript); setDetailScript(null); setIterateFrom(null); setShowForm(true) }}
           onIterate={() => handleIterate(detailScript)}
         />
+      )}
+
+      {showCompare && compareIds.length >= 2 && (
+        <ScriptCompare ids={compareIds} onClose={() => setShowCompare(false)} />
       )}
     </div>
   )

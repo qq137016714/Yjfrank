@@ -7,6 +7,7 @@ type Metric = 'cost' | 'customers' | 'roi'
 
 interface Top10ChartsProps {
   refreshTrigger?: number
+  uploadId?: string | null
 }
 
 const COLORS = ['#1E40AF','#2563EB','#3B82F6','#60A5FA','#93C5FD','#BFDBFE','#DBEAFE','#EFF6FF','#F0F9FF','#E0F2FE']
@@ -22,14 +23,15 @@ const fmt = (v: number, unit: string) => {
   return v >= 10000 ? `${(v / 10000).toFixed(1)}万` : v.toFixed(unit === '' && v < 10 ? 3 : 0)
 }
 
-export default function Top10Charts({ refreshTrigger }: Top10ChartsProps) {
+export default function Top10Charts({ refreshTrigger, uploadId }: Top10ChartsProps) {
   const [metric, setMetric] = useState<Metric>('cost')
   const [allData, setAllData] = useState<Record<Metric, { name: string; value: number }[]>>({
     cost: [], customers: [], roi: [],
   })
 
   const load = useCallback(async () => {
-    const res = await fetch('/api/stats')
+    const url = uploadId ? `/api/stats?uploadId=${uploadId}` : '/api/stats'
+    const res = await fetch(url)
     const json = await res.json()
     if (json.success) {
       setAllData({
@@ -38,7 +40,7 @@ export default function Top10Charts({ refreshTrigger }: Top10ChartsProps) {
         roi:       json.data.top10Roi ?? [],
       })
     }
-  }, [])
+  }, [uploadId])
 
   useEffect(() => { load() }, [load, refreshTrigger])
 
