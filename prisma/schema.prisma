@@ -267,6 +267,24 @@ model ScriptChannelStat {
   @@unique([scriptId, channel])
 }
 
+model Keyword {
+  id        String   @id @default(cuid())
+  type      String   // EDITOR | CUTTER | INVESTOR | ACTOR | PROJECT
+  char      String   // 单字符代号（如 "塔"）
+  name      String   // 真实姓名（如 "波塔"）
+  createdAt DateTime @default(now())
+
+  @@unique([type, char])
+}
+
+model SystemConfig {
+  key         String   @id   // "blockWords" | "contentTypes"
+  value       String         // JSON 数组字符串
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 // 渠道×期次统计（独立于脚本匹配，动态识别渠道）
 model ChannelPeriodStat {
   id       String      @id @default(cuid())

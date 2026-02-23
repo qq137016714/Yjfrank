@@ -61,6 +61,18 @@ export default function Navbar() {
                   {link.label}
                 </Link>
               ))}
+              {session.user?.role === 'admin' && (
+                <Link
+                  href="/admin"
+                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    pathname.startsWith('/admin')
+                      ? 'bg-blue-50 text-blue-700'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  }`}
+                >
+                  管理后台
+                </Link>
+              )}
             </div>
           </div>
 

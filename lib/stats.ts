@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db'
-import { matchScriptName } from '@/lib/matching'
+import { matchScriptName, type MatchConfig } from '@/lib/matching'
 
 /** 判断渠道值是否有效（过滤 "-"、空值、"合计" 等汇总行） */
 function isValidChannel(channel: string | null | undefined): channel is string {
@@ -77,18 +77,24 @@ export async function recalculateChannelPeriodStats(): Promise<void> {
 
 // ─── 脚本统计（含渠道分组）────────────────────────────────────────────────
 export async function recalculateAllStats(): Promise<void> {
-  const [scripts, allRows, uploads] = await Promise.all([
+  const [scripts, allRows, uploads, blockWordsConfig, contentTypesConfig] = await Promise.all([
     prisma.script.findMany(),
-    // 只取有效数据行
     prisma.excelRow.findMany(),
     prisma.excelUpload.findMany({ select: { id: true } }),
+    prisma.systemConfig.findUnique({ where: { key: 'blockWords' } }),
+    prisma.systemConfig.findUnique({ where: { key: 'contentTypes' } }),
   ])
+
+  const config: MatchConfig = {
+    blockWords: JSON.parse(blockWordsConfig?.value ?? '[]'),
+    contentTypes: JSON.parse(contentTypesConfig?.value ?? '[]'),
+  }
 
   const uploadCount = uploads.length
 
   for (const script of scripts) {
     const rows = allRows.filter(
-      r => isDataRow(r.materialName) && matchScriptName(r.materialName, script.name)
+      r => isDataRow(r.materialName) && matchScriptName(r.materialName, script.name, config)
     )
 
     if (rows.length === 0) {

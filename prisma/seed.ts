@@ -37,6 +37,19 @@ const TAGS = [
   { name: '社交',       type: 'end' },
 ]
 
+const SYSTEM_CONFIGS = [
+  {
+    key: 'blockWords',
+    value: JSON.stringify(["一改","二改","三改","四改","五改","六改","七改","八改","九改","十改","1改","2改","3改","4改","5改","6改","7改","8改","9改","10改"]),
+    description: '素材名中需要移除的改版标记',
+  },
+  {
+    key: 'contentTypes',
+    value: JSON.stringify(["课程","才艺","干货"]),
+    description: '素材名末尾的内容类型标记',
+  },
+]
+
 async function main() {
   const hashedPassword = await bcrypt.hash('123456', 10)
 
@@ -55,6 +68,15 @@ async function main() {
     })
   }
   console.log(`✅ 标签初始化完成（共 ${TAGS.length} 个）`)
+
+  for (const cfg of SYSTEM_CONFIGS) {
+    await prisma.systemConfig.upsert({
+      where: { key: cfg.key },
+      update: {},
+      create: cfg,
+    })
+  }
+  console.log('✅ 系统配置初始化完成')
 }
 
 main()
