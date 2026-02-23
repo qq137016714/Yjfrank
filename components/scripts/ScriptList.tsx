@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Search, Plus, Trash2, Loader2, FileText, GitBranch, SlidersHorizontal } from 'lucide-react'
+import { Search, Plus, Trash2, Loader2, FileText, GitBranch, SlidersHorizontal, Upload, CheckSquare } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import ScriptForm from './ScriptForm'
 import ScriptDetail from './ScriptDetail'
 import ScriptCompare from './ScriptCompare'
+import ScriptImport from './ScriptImport'
 
 interface Tag { id: string; name: string; type: string }
 interface Script {
@@ -51,6 +52,10 @@ export default function ScriptList() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [compareIds, setCompareIds] = useState<string[]>([])
   const [showCompare, setShowCompare] = useState(false)
+  const [showImport, setShowImport] = useState(false)
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [batchDeleting, setBatchDeleting] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -71,6 +76,27 @@ export default function ScriptList() {
     await fetch(`/api/scripts/${id}`, { method: 'DELETE' })
     setScripts(prev => prev.filter(s => s.id !== id))
     setDeletingId(null)
+  }
+
+  const toggleSelect = (id: string) =>
+    setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+
+  const handleBatchDelete = async () => {
+    if (selectedIds.size === 0) return
+    if (!confirm(`确认删除选中的 ${selectedIds.size} 条脚本？此操作不可恢复。`)) return
+    setBatchDeleting(true)
+    const res = await fetch('/api/scripts/batch-delete', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: Array.from(selectedIds) }),
+    })
+    const json = await res.json()
+    if (json.success) {
+      setScripts(prev => prev.filter(s => !selectedIds.has(s.id)))
+      setSelectedIds(new Set())
+      setSelectMode(false)
+    }
+    setBatchDeleting(false)
   }
 
   const handleIterate = (script: Script) => {
@@ -122,6 +148,18 @@ export default function ScriptList() {
           className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
           <Plus className="w-4 h-4" />上传脚本
         </button>
+        <button onClick={() => setShowImport(true)}
+          className="flex items-center gap-2 bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50">
+          <Upload className="w-4 h-4" />批量导入
+        </button>
+        {isAdmin && (
+          <button onClick={() => { setSelectMode(!selectMode); setSelectedIds(new Set()) }}
+            className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm font-medium transition-colors ${
+              selectMode ? 'bg-red-50 border-red-300 text-red-600' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+            }`}>
+            <CheckSquare className="w-4 h-4" />{selectMode ? '退出多选' : '多选'}
+          </button>
+        )}
       </div>
 
       {/* 筛选面板 */}
@@ -158,6 +196,23 @@ export default function ScriptList() {
         </div>
       )}
 
+      {/* 批量删除栏 */}
+      {selectMode && (
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-red-50 border border-red-200 rounded-xl text-sm">
+          <span className="text-red-700 font-medium">已选 {selectedIds.size} 条</span>
+          <div className="flex-1" />
+          <button onClick={() => setSelectedIds(new Set(filtered.map(s => s.id)))}
+            className="text-red-500 hover:text-red-700 text-xs">全选当前页</button>
+          <button onClick={() => setSelectedIds(new Set())}
+            className="text-gray-400 hover:text-gray-600 text-xs">取消全选</button>
+          <button onClick={handleBatchDelete} disabled={batchDeleting || selectedIds.size === 0}
+            className="flex items-center gap-1.5 px-3 py-1 bg-red-500 text-white rounded-lg text-xs font-medium hover:bg-red-600 disabled:opacity-50">
+            {batchDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+            删除选中
+          </button>
+        </div>
+      )}
+
       {/* 对比栏 */}
       {compareIds.length > 0 && (
         <div className="flex items-center gap-3 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-sm">
@@ -184,11 +239,18 @@ export default function ScriptList() {
         <div className="space-y-2">
           {filtered.map(script => (
             <div key={script.id}
-              className={`border rounded-xl p-4 hover:bg-gray-50 cursor-pointer transition-colors ${
-                compareIds.includes(script.id) ? 'border-amber-400 bg-amber-50' : ''
-              }`}
-              onClick={() => setDetailScript(script)}>
+              className={`border rounded-xl p-4 hover:bg-gray-50 transition-colors ${
+                compareIds.includes(script.id) ? 'border-amber-400 bg-amber-50' :
+                selectedIds.has(script.id) ? 'border-red-300 bg-red-50' : ''
+              } ${!selectMode ? 'cursor-pointer' : 'cursor-default'}`}
+              onClick={() => selectMode ? toggleSelect(script.id) : setDetailScript(script)}>
               <div className="flex items-start justify-between gap-3">
+                {selectMode && (
+                  <input type="checkbox" checked={selectedIds.has(script.id)}
+                    onChange={() => toggleSelect(script.id)}
+                    onClick={e => e.stopPropagation()}
+                    className="mt-1 rounded border-gray-300 text-red-500 shrink-0" />
+                )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-medium text-gray-900">{script.name}</span>
@@ -277,6 +339,10 @@ export default function ScriptList() {
 
       {showCompare && compareIds.length >= 2 && (
         <ScriptCompare ids={compareIds} onClose={() => setShowCompare(false)} />
+      )}
+
+      {showImport && (
+        <ScriptImport onClose={() => setShowImport(false)} onSuccess={load} />
       )}
     </div>
   )

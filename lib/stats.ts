@@ -98,11 +98,7 @@ export async function recalculateAllStats(): Promise<void> {
     )
 
     if (rows.length === 0) {
-      await prisma.scriptStat.upsert({
-        where: { scriptId: script.id },
-        create: { scriptId: script.id, matchedRows: 0, uploadCount },
-        update: { matchedRows: 0, uploadCount },
-      })
+      await prisma.scriptStat.deleteMany({ where: { scriptId: script.id } })
       await prisma.scriptChannelStat.deleteMany({ where: { scriptId: script.id } })
       continue
     }

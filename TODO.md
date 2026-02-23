@@ -4,7 +4,7 @@
 
 ## 🚀 QUICK START TIPS（新会话必读，节省 token）
 
-### 项目状态：v2.9 已完成，下次从 v3.0 开始
+### 项目状态：v2.9.1 已完成，下次从 v3.0 开始
 
 ### 技术栈
 - **框架**：Next.js 16 (App Router) + TypeScript
@@ -41,6 +41,9 @@ Script → Script（父子自关联，parentId）
 Keyword（type/char/name，命名规则关键词）
 SystemConfig（key/value，blockWords + contentTypes）
 ```
+
+| `POST /api/scripts/import/parse` | 解析上传文件（.txt/.docx），返回预览+警告 |
+| `POST /api/scripts/import/save` | 批量保存已确认脚本 |
 
 ### 关键 API
 | 端点 | 说明 |
@@ -361,6 +364,21 @@ v2.0 存在两个核心问题：
 - [x] 管理员登录后 Navbar 出现「管理后台」链接
 - [x] 非管理员访问 `/admin` 被重定向到 `/dashboard`
 - [x] 5个 Tab 均可正常增删操作
+
+---
+
+## v2.9.1 — 脚本批量导入 ✅ 已完成
+
+### 完成内容
+- [x] 安装 `mammoth`（.docx 转纯文本）
+- [x] 新建 `public/script-template.txt`：标准格式模板，供编导下载参考
+- [x] 新建 `lib/script-parser.ts`：文本解析库（行正则匹配、脚本名去数字、同名合并、多行续行、错误收集）
+- [x] 新建 `POST /api/scripts/import/parse`：接收 .txt/.docx，返回解析结果 + 重复名警告 + 未知标签警告
+- [x] 新建 `POST /api/scripts/import/save`：批量创建脚本，跳过已存在名称，全部完成后触发一次 `recalculateAllStats()`
+- [x] 新建 `components/scripts/ScriptImport.tsx`：三阶段弹窗（上传 → 预览纠错 → 完成），含拖拽上传、格式说明折叠面板、模板下载、逐条勾选、警告横幅
+- [x] 更新 `components/scripts/ScriptList.tsx`：工具栏新增「批量导入」按钮
+
+### 无 Schema 变更，无数据库迁移
 
 ---
 
