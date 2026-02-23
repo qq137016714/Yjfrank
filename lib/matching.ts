@@ -39,7 +39,8 @@ export function cleanMaterialName(materialName: string, blockWords: string[] = [
  * 从清洗后的素材名末尾提取内容类型（如 "课程"、"才艺"、"干货"）
  */
 export function extractContentType(cleanedName: string, contentTypes: string[]): string | null {
-  for (const ct of contentTypes) {
+  const sorted = [...contentTypes].sort((a, b) => b.length - a.length)
+  for (const ct of sorted) {
     if (cleanedName.endsWith(ct)) return ct
   }
   return null

@@ -14,6 +14,7 @@ import PeriodSelector from '@/components/dashboard/PeriodSelector'
 import ScriptManager from '@/components/dashboard/ScriptManager'
 import ScriptSearch from '@/components/dashboard/ScriptSearch'
 import ContentTypeAnalysis from '@/components/dashboard/ContentTypeAnalysis'
+import TagAnalysis from '@/components/dashboard/TagAnalysis'
 import AnalysisControls from '@/components/dashboard/AnalysisControls'
 import ChannelAnalysis from '@/components/dashboard/ChannelAnalysis'
 import DetailedAnalysis from '@/components/dashboard/DetailedAnalysis'
@@ -51,6 +52,7 @@ export default function DashboardPage() {
         <SmartSummary refreshTrigger={refreshTrigger} uploadId={selectedUploadId} />
         <ScriptInsights refreshTrigger={refreshTrigger} />
         <ContentTypeAnalysis refreshTrigger={refreshTrigger} />
+        <TagAnalysis refreshTrigger={refreshTrigger} />
 
         {/* 数据分析控制面板 - 仅管理员可见 */}
         {isAdmin && (

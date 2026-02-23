@@ -18,6 +18,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json<ApiResponse>({ success: false, message: '没有可导入的脚本' }, { status: 400 })
   }
 
+  // 收集所有需要的标签及其类型（front > mid > end 优先）
+  const tagTypeMap = new Map<string, string>()
+  for (const s of scripts) {
+    for (const n of s.frontTagNames) if (!tagTypeMap.has(n)) tagTypeMap.set(n, 'front')
+    for (const n of s.midTagNames)   if (!tagTypeMap.has(n)) tagTypeMap.set(n, 'mid')
+    for (const n of s.endTagNames)   if (!tagTypeMap.has(n)) tagTypeMap.set(n, 'end')
+  }
+
+  // Upsert 所有标签（不存在则创建，已存在则跳过）
+  for (const [name, type] of tagTypeMap) {
+    await prisma.tag.upsert({
+      where: { name },
+      update: {},
+      create: { name, type },
+    })
+  }
+
   const allTags = await prisma.tag.findMany({ select: { id: true, name: true, type: true } })
   const tagByName = new Map(allTags.map(t => [t.name, t]))
 
@@ -51,6 +68,23 @@ export async function POST(request: NextRequest) {
 
   if (created > 0) {
     recalculateAllStats().catch(console.error)
+
+    // Auto-detect content types from imported script names
+    const newTypes = [...new Set(scripts.map(s => s.name.slice(-2)).filter(t => t.length === 2))]
+    prisma.systemConfig.findMany({ where: { key: { in: ['contentTypes', 'disabledContentTypes'] } } })
+      .then(configs => {
+        const ct: string[] = JSON.parse(configs.find(c => c.key === 'contentTypes')?.value ?? '[]')
+        const dt: string[] = JSON.parse(configs.find(c => c.key === 'disabledContentTypes')?.value ?? '[]')
+        const toAdd = newTypes.filter(t => !ct.includes(t) && !dt.includes(t))
+        if (toAdd.length > 0) {
+          return prisma.systemConfig.upsert({
+            where: { key: 'contentTypes' },
+            update: { value: JSON.stringify([...ct, ...toAdd]) },
+            create: { key: 'contentTypes', value: JSON.stringify(toAdd) },
+          })
+        }
+      })
+      .catch(console.error)
   }
 
   return NextResponse.json<ApiResponse>({ success: true, data: { created, skipped } })
