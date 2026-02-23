@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Search, Plus, Trash2, Loader2, FileText, GitBranch, SlidersHorizontal, Upload, CheckSquare } from 'lucide-react'
+import { Search, Plus, Trash2, Loader2, FileText, GitBranch, SlidersHorizontal, Upload, CheckSquare, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import ScriptForm from './ScriptForm'
 import ScriptDetail from './ScriptDetail'
@@ -33,6 +33,8 @@ const TYPE_ACTIVE: Record<string, string> = {
 }
 const money = (v: number) => v >= 10000 ? `¥${(v / 10000).toFixed(1)}万` : `¥${v.toFixed(0)}`
 
+const PAGE_SIZE = 20
+
 export default function ScriptList() {
   const { data: session } = useSession()
   const isAdmin = session?.user?.role === 'admin'
@@ -56,6 +58,7 @@ export default function ScriptList() {
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [batchDeleting, setBatchDeleting] = useState(false)
+  const [page, setPage] = useState(1)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -106,8 +109,10 @@ export default function ScriptList() {
     setShowForm(true)
   }
 
-  const toggleFilterTag = (id: string) =>
+  const toggleFilterTag = (id: string) => {
     setFilterTagIds(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id])
+    setPage(1)
+  }
 
   const toggleCompare = (id: string) =>
     setCompareIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : prev.length < 4 ? [...prev, id] : prev)
@@ -118,6 +123,9 @@ export default function ScriptList() {
     if (filterTagIds.length > 0 && !filterTagIds.some(tid => s.tags.some(t => t.id === tid))) return false
     return true
   })
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   const tagsByType = ['front', 'mid', 'end'].map(type => ({
     type,
@@ -133,7 +141,7 @@ export default function ScriptList() {
       <div className="flex gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-          <input type="text" value={query} onChange={e => setQuery(e.target.value)}
+          <input type="text" value={query} onChange={e => { setQuery(e.target.value); setPage(1) }}
             placeholder="搜索脚本名..."
             className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
         </div>
@@ -167,14 +175,14 @@ export default function ScriptList() {
         <div className="border border-gray-200 rounded-xl p-4 space-y-3 bg-gray-50">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs text-gray-500 font-medium w-10 shrink-0">快速</span>
-            <button onClick={() => setHasDataOnly(!hasDataOnly)}
+            <button onClick={() => { setHasDataOnly(!hasDataOnly); setPage(1) }}
               className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
                 hasDataOnly ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
               }`}>
               有投放数据
             </button>
             {activeFilterCount > 0 && (
-              <button onClick={() => { setFilterTagIds([]); setHasDataOnly(false) }}
+              <button onClick={() => { setFilterTagIds([]); setHasDataOnly(false); setPage(1) }}
                 className="px-3 py-1 rounded-full text-xs text-red-500 border border-red-200 hover:bg-red-50">
                 清除筛选
               </button>
@@ -236,8 +244,9 @@ export default function ScriptList() {
           <p>{query || activeFilterCount > 0 ? '没有匹配的脚本' : '暂无脚本，点击「上传脚本」开始'}</p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {filtered.map(script => (
+        <>
+          <div className="space-y-2">
+            {paginated.map(script => (
             <div key={script.id}
               className={`border rounded-xl p-4 hover:bg-gray-50 transition-colors ${
                 compareIds.includes(script.id) ? 'border-amber-400 bg-amber-50' :
@@ -315,7 +324,37 @@ export default function ScriptList() {
               </div>
             </div>
           ))}
-        </div>
+          </div>
+
+          {/* 分页控件 */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 bg-white border border-gray-200 rounded-lg mt-4">
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <span>第 {page}/{totalPages} 页</span>
+                <span>·</span>
+                <span>共 {filtered.length} 条</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage(page - 1)}
+                  disabled={page === 1}
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  上一页
+                </button>
+                <button
+                  onClick={() => setPage(page + 1)}
+                  disabled={page === totalPages}
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  下一页
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {showForm && (

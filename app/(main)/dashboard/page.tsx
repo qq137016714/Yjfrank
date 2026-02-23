@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react'
 import Navbar from '@/components/ui/Navbar'
 import ExcelUploader from '@/components/dashboard/ExcelUploader'
 import UploadHistory from '@/components/dashboard/UploadHistory'
-import KpiCards from '@/components/dashboard/KpiCards'
+import CombinedKpiSection from '@/components/dashboard/CombinedKpiSection'
 import Top10Charts from '@/components/dashboard/Top10Charts'
 import ChannelCharts from '@/components/dashboard/ChannelCharts'
 import SmartSummary from '@/components/dashboard/SmartSummary'
@@ -13,6 +13,10 @@ import ScriptInsights from '@/components/dashboard/ScriptInsights'
 import PeriodSelector from '@/components/dashboard/PeriodSelector'
 import ScriptManager from '@/components/dashboard/ScriptManager'
 import ScriptSearch from '@/components/dashboard/ScriptSearch'
+import ContentTypeAnalysis from '@/components/dashboard/ContentTypeAnalysis'
+import AnalysisControls from '@/components/dashboard/AnalysisControls'
+import ChannelAnalysis from '@/components/dashboard/ChannelAnalysis'
+import DetailedAnalysis from '@/components/dashboard/DetailedAnalysis'
 import { BarChart3, PieChart } from 'lucide-react'
 
 type ChartTab = 'top10' | 'channel'
@@ -43,10 +47,21 @@ export default function DashboardPage() {
           />
         </div>
 
-        <KpiCards refreshTrigger={refreshTrigger} uploadId={selectedUploadId} />
+        <CombinedKpiSection refreshTrigger={refreshTrigger} uploadId={selectedUploadId} />
         <SmartSummary refreshTrigger={refreshTrigger} uploadId={selectedUploadId} />
         <ScriptInsights refreshTrigger={refreshTrigger} />
+        <ContentTypeAnalysis refreshTrigger={refreshTrigger} />
 
+        {/* 数据分析控制面板 - 仅管理员可见 */}
+        {isAdmin && (
+          <AnalysisControls onRefresh={refresh} />
+        )}
+
+        {/* 渠道分析 */}
+        <ChannelAnalysis refreshTrigger={refreshTrigger} />
+
+        {/* 详细数据分析 */}
+        <DetailedAnalysis refreshTrigger={refreshTrigger} uploadId={selectedUploadId} />
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* 左侧：图表区 */}
           <div className="lg:col-span-2 space-y-6">

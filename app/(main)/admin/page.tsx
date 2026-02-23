@@ -31,7 +31,9 @@ export default function AdminPage() {
   const [newBlockWord, setNewBlockWord] = useState('')
   // ContentTypes state
   const [contentTypes, setContentTypes] = useState<string[]>([])
+  const [disabledContentTypes, setDisabledContentTypes] = useState<string[]>([])
   const [newContentType, setNewContentType] = useState('')
+  const [scanningTypes, setScanningTypes] = useState(false)
   // Excel state
   const [excels, setExcels] = useState<ExcelUpload[]>([])
   const [saving, setSaving] = useState(false)
@@ -59,6 +61,7 @@ export default function AdminPage() {
     if (json.success) {
       setBlockWords(json.data.blockWords ?? [])
       setContentTypes(json.data.contentTypes ?? [])
+      setDisabledContentTypes(json.data.disabledContentTypes ?? [])
     }
   }, [])
 
@@ -119,6 +122,28 @@ export default function AdminPage() {
       body: JSON.stringify({ key, value }),
     })
     setSaving(false)
+  }
+
+  const scanContentTypes = async () => {
+    setScanningTypes(true)
+    try {
+      const res = await fetch('/api/admin/scan-content-types', { method: 'POST' })
+      const json = await res.json()
+      if (json.success) {
+        await loadSystemConfig()
+        if (json.data.added > 0) {
+          alert(`扫描完成！新增 ${json.data.added} 个类型：${json.data.types.join(', ')}`)
+        } else {
+          alert('扫描完成！未发现新类型')
+        }
+      } else {
+        alert('扫描失败：' + json.error)
+      }
+    } catch (error) {
+      alert('扫描失败：' + error)
+    } finally {
+      setScanningTypes(false)
+    }
   }
 
   // ── Excel ──────────────────────────────────────────────────────────────────
@@ -314,40 +339,113 @@ export default function AdminPage() {
 
         {/* ContentTypes Tab */}
         {tab === 'contentTypes' && (
-          <div className="bg-white rounded-lg shadow-sm border p-4 space-y-4">
-            <div className="flex gap-2">
-              <input
-                value={newContentType}
-                onChange={e => setNewContentType(e.target.value)}
-                placeholder="输入素材类型，如：直播"
-                className="border rounded px-3 py-1.5 text-sm flex-1"
-              />
-              <button
-                onClick={() => {
-                  if (!newContentType.trim() || contentTypes.includes(newContentType.trim())) return
-                  setContentTypes(prev => [...prev, newContentType.trim()])
-                  setNewContentType('')
-                }}
-                className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
-              >
-                添加
-              </button>
+          <div className="space-y-4">
+            {/* Add form and scan button */}
+            <div className="bg-white rounded-lg shadow-sm border p-4 space-y-3">
+              <div className="flex gap-2">
+                <input
+                  value={newContentType}
+                  onChange={e => setNewContentType(e.target.value)}
+                  placeholder="手动添加素材类型，如：直播"
+                  className="border rounded px-3 py-1.5 text-sm flex-1"
+                />
+                <button
+                  onClick={async () => {
+                    const t = newContentType.trim()
+                    if (!t || contentTypes.includes(t) || disabledContentTypes.includes(t)) return
+                    const next = [...contentTypes, t]
+                    setContentTypes(next)
+                    setNewContentType('')
+                    await saveConfig('contentTypes', next)
+                  }}
+                  className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+                >
+                  添加
+                </button>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={scanContentTypes}
+                  disabled={scanningTypes}
+                  className="px-4 py-1.5 bg-green-600 text-white text-sm rounded hover:bg-green-700 disabled:opacity-50"
+                >
+                  {scanningTypes ? '扫描中...' : '扫描脚本库'}
+                </button>
+                <span className="text-xs text-gray-500 self-center">自动检测脚本名称后缀并添加为素材类型</span>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {contentTypes.map(ct => (
-                <span key={ct} className="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded text-sm">
-                  {ct}
-                  <button onClick={() => setContentTypes(prev => prev.filter(x => x !== ct))} className="text-gray-400 hover:text-red-500 ml-1">×</button>
-                </span>
-              ))}
+
+            {/* Enabled types */}
+            <div className="bg-white rounded-lg shadow-sm border p-4">
+              <p className="text-xs font-medium text-gray-500 mb-3">已启用（{contentTypes.length}）</p>
+              {contentTypes.length === 0 ? (
+                <p className="text-sm text-gray-400">暂无</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {contentTypes.map(ct => (
+                    <span key={ct} className="flex items-center gap-1 px-2 py-1 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
+                      {ct}
+                      <button
+                        onClick={async () => {
+                          const nextEnabled = contentTypes.filter(x => x !== ct)
+                          const nextDisabled = [...disabledContentTypes, ct]
+                          setContentTypes(nextEnabled)
+                          setDisabledContentTypes(nextDisabled)
+                          await saveConfig('contentTypes', nextEnabled)
+                          await saveConfig('disabledContentTypes', nextDisabled)
+                        }}
+                        className="text-xs text-blue-400 hover:text-orange-500 ml-1"
+                        title="禁用"
+                      >禁用</button>
+                      <button
+                        onClick={async () => {
+                          const next = contentTypes.filter(x => x !== ct)
+                          setContentTypes(next)
+                          await saveConfig('contentTypes', next)
+                        }}
+                        className="text-gray-400 hover:text-red-500 ml-0.5"
+                        title="删除"
+                      >×</button>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
-            <button
-              onClick={() => saveConfig('contentTypes', contentTypes)}
-              disabled={saving}
-              className="px-4 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700 disabled:opacity-50"
-            >
-              {saving ? '保存中...' : '保存'}
-            </button>
+
+            {/* Disabled types */}
+            {disabledContentTypes.length > 0 && (
+              <div className="bg-white rounded-lg shadow-sm border p-4">
+                <p className="text-xs font-medium text-gray-500 mb-3">已禁用（{disabledContentTypes.length}）</p>
+                <div className="flex flex-wrap gap-2">
+                  {disabledContentTypes.map(ct => (
+                    <span key={ct} className="flex items-center gap-1 px-2 py-1 bg-gray-100 border border-gray-200 rounded text-sm text-gray-500">
+                      {ct}
+                      <button
+                        onClick={async () => {
+                          const nextDisabled = disabledContentTypes.filter(x => x !== ct)
+                          const nextEnabled = [...contentTypes, ct]
+                          setDisabledContentTypes(nextDisabled)
+                          setContentTypes(nextEnabled)
+                          await saveConfig('disabledContentTypes', nextDisabled)
+                          await saveConfig('contentTypes', nextEnabled)
+                        }}
+                        className="text-xs text-gray-400 hover:text-green-600 ml-1"
+                        title="启用"
+                      >启用</button>
+                      <button
+                        onClick={async () => {
+                          const next = disabledContentTypes.filter(x => x !== ct)
+                          setDisabledContentTypes(next)
+                          await saveConfig('disabledContentTypes', next)
+                        }}
+                        className="text-gray-400 hover:text-red-500 ml-0.5"
+                        title="删除"
+                      >×</button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
