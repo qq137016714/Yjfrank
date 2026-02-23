@@ -4,7 +4,7 @@
 
 ## 🚀 QUICK START TIPS（新会话必读，节省 token）
 
-### 项目状态：v2.0 已完成，下次从 v3.0 开始
+### 项目状态：v2.9 已完成，下次从 v3.0 开始
 
 ### 技术栈
 - **框架**：Next.js 16 (App Router) + TypeScript
@@ -18,15 +18,17 @@
 |------|------|
 | `/dashboard` | 数据分析主页（KPI/图表/渠道/脚本洞察） |
 | `/scripts` | 脚本管理页（列表/筛选/详情/对比） |
+| `/admin` | 管理后台（用户/命名规则/屏蔽词/素材类型/Excel） |
 | `/login` `/register` | 认证页 |
 
 ### 已完成功能一览（v0.1 ~ v2.0）
 - **账号系统**：登录/注册/角色（admin/editor）/锁定机制
 - **EXCEL 上传**：异步解析、进度轮询、历史记录、模板下载
-- **数据匹配**：脚本名模糊匹配 + 边界保护（`lib/matching.ts`）
-- **统计计算**：多期聚合（加算/平均/重算）、渠道×期次矩阵（`lib/stats.ts`）
+- **数据匹配**：素材名清洗（脏前缀/日期/改版标记）+ 精确提取路径 + 子串回退 + 边界保护（`lib/matching.ts`）
+- **统计计算**：多期聚合（加算/平均/重算）、渠道×期次矩阵（`lib/stats.ts`），动态加载 DB 配置
 - **数据看板**：KPI 卡片、TOP10 图表（消耗/获客/ROI）、渠道分析、期次筛选器、最佳源脚本/迭代脚本洞察
 - **脚本管理**：完整 CRUD、标签多选（前/中/尾贴）、父子关系、搜索筛选、投放数据 Tab、多脚本对比
+- **管理后台**：用户管理（锁定/删除）、命名规则关键词、屏蔽词、素材类型、Excel 历史管理
 
 ### 核心数据模型（Prisma）
 ```
@@ -36,6 +38,8 @@ Script → ScriptStat（全期聚合）
 Script → ScriptChannelStat（按渠道聚合）
 ExcelUpload → ChannelPeriodStat（渠道×期次）
 Script → Script（父子自关联，parentId）
+Keyword（type/char/name，命名规则关键词）
+SystemConfig（key/value，blockWords + contentTypes）
 ```
 
 ### 关键 API
@@ -47,6 +51,9 @@ Script → Script（父子自关联，parentId）
 | `GET /api/scripts/[id]` | 脚本详情（含 channelStats） |
 | `GET /api/scripts/compare?ids=a,b,c` | 多脚本对比 |
 | `GET /api/excel/history` | 上传历史（含 period 字段） |
+| `GET/POST/DELETE /api/admin/keywords` | 命名规则关键词管理（admin） |
+| `GET/PUT /api/admin/system-config` | 屏蔽词/素材类型配置（admin） |
+| `GET/PUT/DELETE /api/admin/users` | 用户管理（admin） |
 
 ### 重要约定
 - 脚本名全平台唯一（`Script.name` unique）
@@ -303,6 +310,57 @@ npx next build       # 确认无 TypeScript 错误
 - [x] 修复 SmartSummary 脚本名截断问题（移除 max-w-[120px]）
 - [x] 移除首页 ScriptManager 快速添加入口（绕过表单校验的漏洞）
 - [x] 修复对比弹窗获客成本未计算（avgCustomerCost 为计算字段，在 API 补算）
+
+---
+
+## v2.9 — 匹配逻辑修复 + 管理员后台 ✅ 已完成
+
+### 背景
+v2.0 存在两个核心问题：
+1. `matchScriptName` 只做简单子串查找，未清洗素材名（脏前缀/后缀/改版标记），导致部分素材无法正确匹配脚本
+2. 管理员后台完全缺失，无法动态配置命名规则、屏蔽词、素材类型
+
+### Schema 变更
+- [x] 新增 `Keyword` 模型（type/char/name，命名规则关键词，`@@unique([type, char])`）
+- [x] 新增 `SystemConfig` 模型（key/value JSON，存储 blockWords + contentTypes）
+- [x] 数据库迁移（`20260223_add_keyword_systemconfig`）
+- [x] seed 初始化：blockWords（20个改版标记）、contentTypes（课程/才艺/干货）
+
+### 匹配逻辑重写（`lib/matching.ts`）
+- [x] 新增 `cleanMaterialName()`：移除 .mp4/.mov、`代理-` 前缀、`一键修复_` 前缀、末尾 `-XXX` 标记、5-6位日期、blockWords 改版标记、开头非中文字符
+- [x] 新增 `extractContentType()`：从清洗后名称末尾提取 contentTypes 中的类型标记
+- [x] 新增 `MatchConfig` 接口（blockWords + contentTypes）
+- [x] 更新 `matchScriptName()` 签名，接收 config 参数
+- [x] 精确提取路径：清洗后长度 ≥ 8 时，取第7位后内容，移除末尾 contentType，与 scriptName 精确比对
+- [x] 回退路径：精确提取失败时，在清洗后名称中做子串匹配（保留数字边界保护）
+
+### 统计计算更新（`lib/stats.ts`）
+- [x] `recalculateAllStats()` 开头从 DB 加载 blockWords / contentTypes 配置
+- [x] 将 `config` 传入 `matchScriptName()`，实现动态配置驱动匹配
+
+### 管理员 API（3个新路由，统一 admin 鉴权）
+- [x] `GET/POST/DELETE /api/admin/keywords`：关键词增删查，按 type 分组返回
+- [x] `GET/PUT /api/admin/system-config`：读取/更新 blockWords 和 contentTypes
+- [x] `GET/PUT/DELETE /api/admin/users`：用户列表、锁定/解锁、删除（不能删自己）
+
+### 管理后台 UI（`app/(main)/admin/page.tsx`）
+- [x] admin 权限守卫（非 admin 重定向到 /dashboard）
+- [x] 用户管理 Tab：列表展示、锁定/解锁、删除
+- [x] 命名规则 Tab：按 EDITOR/CUTTER/INVESTOR/ACTOR/PROJECT 分组，增删关键词
+- [x] 屏蔽词 Tab：Tag 式展示 blockWords，增删，保存到 DB
+- [x] 素材类型 Tab：Tag 式展示 contentTypes，增删，保存到 DB
+- [x] Excel管理 Tab：上传历史列表，删除记录
+
+### Navbar 更新
+- [x] admin 角色显示「管理后台」导航链接，路径高亮
+
+### 验收测试
+- [x] `npx prisma migrate dev` 成功，`npx prisma db seed` 写入默认配置
+- [x] TypeScript 编译无错误（`npx tsc --noEmit`）
+- [x] 素材名 `代理-60106威原塔威希玉通精挑对细选课程-WJJ.mp4` 清洗后可匹配脚本 `精挑对细选`
+- [x] 管理员登录后 Navbar 出现「管理后台」链接
+- [x] 非管理员访问 `/admin` 被重定向到 `/dashboard`
+- [x] 5个 Tab 均可正常增删操作
 
 ---
 
