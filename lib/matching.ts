@@ -29,6 +29,9 @@ export function cleanMaterialName(materialName: string, blockWords: string[] = [
     name = name.split(word).join('')
   }
 
+  // 6.5 移除所有改版标记（兜底：改N / N改，支持阿拉伯数字和中文数字）
+  name = name.replace(/改\d+|改[一二三四五六七八九十]+|\d+改|[一二三四五六七八九十]+改/g, '')
+
   // 7. 移除开头的非中文字符（字母、数字、符号）直到遇到第一个中文字符
   name = name.replace(/^[^\u4e00-\u9fa5]+/, '')
 
@@ -48,10 +51,7 @@ export function extractContentType(cleanedName: string, contentTypes: string[]):
 
 /**
  * 脚本名模糊匹配
- * 策略：
- * 1. 清洗素材名
- * 2. 若清洗后长度 >= 8，尝试精确提取（取第7位之后，移除末尾 contentType，与 scriptName 精确比对）
- * 3. 精确提取失败时，回退到子串匹配（保留数字边界保护）
+ * 策略：清洗素材名后，判断是否包含脚本名（子串匹配）
  */
 export function matchScriptName(
   materialName: string,
@@ -61,24 +61,7 @@ export function matchScriptName(
   if (!materialName || !scriptName) return false
 
   const cleaned = cleanMaterialName(materialName, config.blockWords)
-
-  // 精确提取路径（清洗后长度 >= 8）
-  if (cleaned.length >= 8) {
-    let extracted = cleaned.slice(6) // 取第7位（index 6）之后的内容
-    const ct = extractContentType(extracted, config.contentTypes)
-    if (ct) extracted = extracted.slice(0, extracted.length - ct.length)
-    extracted = extracted.trim()
-    if (extracted && extracted === scriptName) return true
-  }
-
-  // 回退：子串匹配（在清洗后的名称中查找）
   const searchIn = cleaned || materialName
-  const idx = searchIn.indexOf(scriptName)
-  if (idx === -1) return false
 
-  // 数字边界保护：脚本名后紧跟数字则不匹配
-  const afterIdx = idx + scriptName.length
-  if (afterIdx < searchIn.length && /\d/.test(searchIn[afterIdx])) return false
-
-  return true
+  return searchIn.includes(scriptName)
 }

@@ -24,12 +24,13 @@ interface ChannelStats {
 
 interface ChannelAnalysisProps {
   refreshTrigger?: number
+  uploadId?: string | null
 }
 
 const fmt = (n: number) =>
   n >= 10000 ? `${(n / 10000).toFixed(2)}万` : n.toFixed(2)
 
-export default function ChannelAnalysis({ refreshTrigger }: ChannelAnalysisProps) {
+export default function ChannelAnalysis({ refreshTrigger, uploadId }: ChannelAnalysisProps) {
   const [data, setData] = useState<ChannelStats[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -37,7 +38,8 @@ export default function ChannelAnalysis({ refreshTrigger }: ChannelAnalysisProps
     const loadData = async () => {
       setLoading(true)
       try {
-        const res = await fetch('/api/stats/channel-analysis')
+        const url = uploadId ? `/api/stats/channel-analysis?uploadId=${uploadId}` : '/api/stats/channel-analysis'
+        const res = await fetch(url)
         const json = await res.json()
         if (json.success) {
           setData(json.data)
@@ -50,7 +52,7 @@ export default function ChannelAnalysis({ refreshTrigger }: ChannelAnalysisProps
     }
 
     loadData()
-  }, [refreshTrigger])
+  }, [refreshTrigger, uploadId])
 
   if (loading) {
     return (

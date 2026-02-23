@@ -19,6 +19,7 @@ interface TagAnalysisData {
 
 interface TagAnalysisProps {
   refreshTrigger?: number
+  uploadId?: string | null
 }
 
 const SEGMENT_LABELS = { front: '前贴', mid: '中段', end: '尾贴' } as const
@@ -85,7 +86,7 @@ function SegmentTable({ items, label, colorClass }: { items: TagStats[]; label: 
   )
 }
 
-export default function TagAnalysis({ refreshTrigger }: TagAnalysisProps) {
+export default function TagAnalysis({ refreshTrigger, uploadId }: TagAnalysisProps) {
   const [data, setData] = useState<TagAnalysisData | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -93,7 +94,8 @@ export default function TagAnalysis({ refreshTrigger }: TagAnalysisProps) {
     const loadData = async () => {
       setLoading(true)
       try {
-        const res = await fetch('/api/stats/by-tag')
+        const url = uploadId ? `/api/stats/by-tag?uploadId=${uploadId}` : '/api/stats/by-tag'
+        const res = await fetch(url)
         const json = await res.json()
         if (json.success) setData(json.data)
       } catch (error) {
@@ -103,7 +105,7 @@ export default function TagAnalysis({ refreshTrigger }: TagAnalysisProps) {
       }
     }
     loadData()
-  }, [refreshTrigger])
+  }, [refreshTrigger, uploadId])
 
   return (
     <div className="bg-white rounded-xl border p-6">

@@ -9,24 +9,18 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { searchParams } = new URL(req.url)
+    const uploadId = searchParams.get('uploadId') || undefined
+
     const channelStats = await prisma.channelPeriodStat.groupBy({
       by: ['channel'],
+      where: uploadId ? { uploadId } : undefined,
       _sum: {
-        totalCost: true,
-        customers: true,
-        highCourseRevenue: true,
-        impressions: true,
-        clicks: true,
-        activations: true,
-        additions: true,
-        highCourseCount: true,
-        refunds: true,
-        lowCourseRevenue: true,
+        totalCost: true, customers: true, highCourseRevenue: true,
+        impressions: true, clicks: true, activations: true, additions: true,
+        highCourseCount: true, refunds: true, lowCourseRevenue: true,
       },
-      _avg: {
-        clickRate: true,
-        conversionRate: true,
-      },
+      _avg: { clickRate: true, conversionRate: true },
       _count: { uploadId: true },
     })
 
@@ -34,12 +28,9 @@ export async function GET(req: NextRequest) {
       const totalCost = stat._sum.totalCost || 0
       const customers = stat._sum.customers || 0
       const highCourseRevenue = stat._sum.highCourseRevenue || 0
-
       return {
         channel: stat.channel,
-        totalCost,
-        customers,
-        highCourseRevenue,
+        totalCost, customers, highCourseRevenue,
         roi: totalCost > 0 ? highCourseRevenue / totalCost : null,
         impressions: stat._sum.impressions || 0,
         clicks: stat._sum.clicks || 0,
@@ -54,10 +45,7 @@ export async function GET(req: NextRequest) {
       }
     })
 
-    return NextResponse.json({
-      success: true,
-      data: data.sort((a, b) => b.totalCost - a.totalCost),
-    })
+    return NextResponse.json({ success: true, data: data.sort((a, b) => b.totalCost - a.totalCost) })
   } catch (error) {
     console.error('Get channel analysis error:', error)
     return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })

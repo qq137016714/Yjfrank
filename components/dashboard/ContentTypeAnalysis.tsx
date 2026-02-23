@@ -13,12 +13,13 @@ interface ContentTypeStats {
 
 interface ContentTypeAnalysisProps {
   refreshTrigger?: number
+  uploadId?: string | null
 }
 
 const fmt = (n: number) =>
   n >= 10000 ? `${(n / 10000).toFixed(2)}万` : n.toFixed(2)
 
-export default function ContentTypeAnalysis({ refreshTrigger }: ContentTypeAnalysisProps) {
+export default function ContentTypeAnalysis({ refreshTrigger, uploadId }: ContentTypeAnalysisProps) {
   const [data, setData] = useState<ContentTypeStats[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -26,7 +27,8 @@ export default function ContentTypeAnalysis({ refreshTrigger }: ContentTypeAnaly
     const loadData = async () => {
       setLoading(true)
       try {
-        const res = await fetch('/api/stats/by-content-type')
+        const url = uploadId ? `/api/stats/by-content-type?uploadId=${uploadId}` : '/api/stats/by-content-type'
+        const res = await fetch(url)
         const json = await res.json()
         if (json.success) {
           setData(json.data)
@@ -39,7 +41,7 @@ export default function ContentTypeAnalysis({ refreshTrigger }: ContentTypeAnaly
     }
 
     loadData()
-  }, [refreshTrigger])
+  }, [refreshTrigger, uploadId])
 
   if (loading) {
     return (

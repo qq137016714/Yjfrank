@@ -18,6 +18,7 @@ import TagAnalysis from '@/components/dashboard/TagAnalysis'
 import AnalysisControls from '@/components/dashboard/AnalysisControls'
 import ChannelAnalysis from '@/components/dashboard/ChannelAnalysis'
 import DetailedAnalysis from '@/components/dashboard/DetailedAnalysis'
+import MemberAnalysis from '@/components/dashboard/MemberAnalysis'
 import { BarChart3, PieChart } from 'lucide-react'
 
 type ChartTab = 'top10' | 'channel'
@@ -51,8 +52,9 @@ export default function DashboardPage() {
         <CombinedKpiSection refreshTrigger={refreshTrigger} uploadId={selectedUploadId} />
         <SmartSummary refreshTrigger={refreshTrigger} uploadId={selectedUploadId} />
         <ScriptInsights refreshTrigger={refreshTrigger} />
-        <ContentTypeAnalysis refreshTrigger={refreshTrigger} />
-        <TagAnalysis refreshTrigger={refreshTrigger} />
+        <ContentTypeAnalysis refreshTrigger={refreshTrigger} uploadId={selectedUploadId} />
+        <TagAnalysis refreshTrigger={refreshTrigger} uploadId={selectedUploadId} />
+        <MemberAnalysis refreshTrigger={refreshTrigger} uploadId={selectedUploadId} />
 
         {/* 数据分析控制面板 - 仅管理员可见 */}
         {isAdmin && (
@@ -60,7 +62,7 @@ export default function DashboardPage() {
         )}
 
         {/* 渠道分析 */}
-        <ChannelAnalysis refreshTrigger={refreshTrigger} />
+        <ChannelAnalysis refreshTrigger={refreshTrigger} uploadId={selectedUploadId} />
 
         {/* 详细数据分析 */}
         <DetailedAnalysis refreshTrigger={refreshTrigger} uploadId={selectedUploadId} />

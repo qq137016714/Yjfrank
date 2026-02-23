@@ -4,7 +4,7 @@
 
 ## 🚀 QUICK START TIPS（新会话必读，节省 token）
 
-### 项目状态：v3.0 进行中（数据分析升级）
+### 项目状态：v3.1 进行中（成员分析 + 分期筛选全覆盖）
 
 ### 技术栈
 - **框架**：Next.js 16 (App Router) + TypeScript
@@ -478,6 +478,32 @@ v2.0 存在两个核心问题：
 - [ ] 验证 `scan-content-types` 扫描结果不含代理公司缩写（P4/DJ/WJ 等）
 - [ ] DetailedAnalysis 组件接入仪表盘并验证数据正确性
 - [ ] ChannelAnalysis 组件数据与 ChannelCharts 数据一致性验证
+
+---
+
+## v3.1 — 成员分析 + 分期筛选全覆盖 ✅ 已完成
+
+### 匹配逻辑修复
+- [x] `matchScriptName()` 简化为纯子串匹配（`cleaned.includes(scriptName)`），移除错误的精确提取路径和数字边界保护
+- [x] `cleanMaterialName()` 新增步骤 6.5：正则移除所有改版标记（`改N` / `N改`，支持阿拉伯数字和中文数字）
+
+### 成员数据分析
+- [x] 新建 `app/api/stats/member-analysis/route.ts`：从 ExcelRow 实时计算，按编导/剪辑分组，支持 `uploadId` 分期筛选
+- [x] 新建 `components/dashboard/MemberAnalysis.tsx`：编导/剪辑 Tab 切换，展示素材数/消耗/获客/ROI/获客成本
+- [x] 匹配逻辑：清洗素材名后，验证位置0=项目字、位置1=原/混，提取位置2=编导、位置4=剪辑，查关键词表映射真实姓名
+
+### 分期筛选全覆盖
+- [x] `app/api/stats/channel-analysis/route.ts`：新增 `uploadId` 参数，过滤 `channelPeriodStat`
+- [x] `app/api/stats/by-content-type/route.ts`：新增 `uploadId` 参数，有 uploadId 时实时计算，无则用预计算
+- [x] `app/api/stats/by-tag/route.ts`：新增 `uploadId` 参数，有 uploadId 时实时计算，无则用预计算
+- [x] `components/dashboard/ChannelAnalysis.tsx`：新增 `uploadId` prop
+- [x] `components/dashboard/ContentTypeAnalysis.tsx`：新增 `uploadId` prop
+- [x] `components/dashboard/TagAnalysis.tsx`：新增 `uploadId` prop
+- [x] `app/(main)/dashboard/page.tsx`：所有分析组件统一接收顶部 `PeriodSelector` 的 `selectedUploadId`
+
+### 首页重构
+- [x] `app/page.tsx`：移除"即将推出"占位卡片，改为可点击的功能导航卡片（数据分析/脚本管理/管理后台）
+- [x] 显示当前版本 v3.1 和更新摘要
 
 ---
 
