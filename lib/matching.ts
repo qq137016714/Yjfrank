@@ -50,8 +50,21 @@ export function extractContentType(cleanedName: string, contentTypes: string[]):
 }
 
 /**
+ * 有序子序列匹配：脚本名的每个字符按顺序出现在素材名中即视为匹配
+ * 例：脚本名"威原塔威玉通课程" 可匹配 "威原塔威希玉通改二课程"（"希"被跳过，"改二"已被清洗）
+ */
+function isSubsequenceMatch(script: string, filename: string): boolean {
+  let i = 0
+  for (const char of filename) {
+    if (i < script.length && char === script[i]) i++
+    if (i === script.length) return true
+  }
+  return i === script.length
+}
+
+/**
  * 脚本名模糊匹配
- * 策略：清洗素材名后，判断是否包含脚本名（子串匹配）
+ * 策略：清洗素材名后，判断脚本名是否为素材名的有序子序列
  */
 export function matchScriptName(
   materialName: string,
@@ -63,5 +76,5 @@ export function matchScriptName(
   const cleaned = cleanMaterialName(materialName, config.blockWords)
   const searchIn = cleaned || materialName
 
-  return searchIn.includes(scriptName)
+  return isSubsequenceMatch(scriptName, searchIn)
 }

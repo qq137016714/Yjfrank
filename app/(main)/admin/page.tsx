@@ -5,16 +5,20 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Navbar from '@/components/ui/Navbar'
 
-type Tab = 'users' | 'keywords' | 'blockWords' | 'contentTypes' | 'excel'
+type Tab = 'users' | 'keywords' | 'blockWords' | 'contentTypes' | 'excel' | 'tags'
 
 interface UserRow { id: string; username: string; role: string; isLocked: boolean; createdAt: string }
 interface Keyword { id: string; type: string; char: string; name: string }
 interface ExcelUpload { id: string; filename: string; period: string; rowCount: number; uploadedBy: string; createdAt: string; status: string }
+interface Tag { id: string; name: string; type: string; _count: { scripts: number } }
 
 const KEYWORD_TYPES = ['EDITOR', 'CUTTER', 'INVESTOR', 'ACTOR', 'PROJECT']
 const KEYWORD_TYPE_LABELS: Record<string, string> = {
   EDITOR: '编导', CUTTER: '剪辑', INVESTOR: '投手', ACTOR: '演员', PROJECT: '项目',
 }
+
+const TAG_TYPES = ['front', 'mid', 'end']
+const TAG_TYPE_LABELS: Record<string, string> = { front: '前贴', mid: '中段', end: '尾贴' }
 
 export default function AdminPage() {
   const { data: session, status } = useSession()
@@ -37,6 +41,10 @@ export default function AdminPage() {
   // Excel state
   const [excels, setExcels] = useState<ExcelUpload[]>([])
   const [saving, setSaving] = useState(false)
+  // Tags state
+  const [tags, setTags] = useState<Record<string, Tag[]>>({})
+  const [newTagName, setNewTagName] = useState('')
+  const [newTagType, setNewTagType] = useState('front')
 
   useEffect(() => {
     if (status === 'loading') return
@@ -71,12 +79,19 @@ export default function AdminPage() {
     if (json.success) setExcels(json.data)
   }, [])
 
+  const loadTags = useCallback(async () => {
+    const res = await fetch('/api/admin/tags')
+    const json = await res.json()
+    if (json.success) setTags(json.data)
+  }, [])
+
   useEffect(() => {
     if (tab === 'users') loadUsers()
     else if (tab === 'keywords') loadKeywords()
     else if (tab === 'blockWords' || tab === 'contentTypes') loadSystemConfig()
     else if (tab === 'excel') loadExcels()
-  }, [tab, loadUsers, loadKeywords, loadSystemConfig, loadExcels])
+    else if (tab === 'tags') loadTags()
+  }, [tab, loadUsers, loadKeywords, loadSystemConfig, loadExcels, loadTags])
 
   if (status === 'loading' || !session || session.user?.role !== 'admin') return null
 
@@ -153,8 +168,29 @@ export default function AdminPage() {
     loadExcels()
   }
 
+  // ── Tags ───────────────────────────────────────────────────────────────────
+  const addTag = async () => {
+    if (!newTagName.trim()) return
+    const res = await fetch('/api/admin/tags', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newTagName.trim(), type: newTagType }),
+    })
+    const json = await res.json()
+    if (!json.success) { alert(json.message); return }
+    setNewTagName('')
+    loadTags()
+  }
+
+  const deleteTag = async (id: string) => {
+    const res = await fetch(`/api/admin/tags?id=${id}`, { method: 'DELETE' })
+    const json = await res.json()
+    if (!json.success) { alert(json.message); return }
+    loadTags()
+  }
+
   const TAB_LABELS: Record<Tab, string> = {
-    users: '用户管理', keywords: '命名规则', blockWords: '屏蔽词', contentTypes: '素材类型', excel: 'Excel管理',
+    users: '用户管理', keywords: '命名规则', blockWords: '屏蔽词', contentTypes: '素材类型', excel: 'Excel管理', tags: '标签管理',
   }
 
   return (
@@ -487,6 +523,71 @@ export default function AdminPage() {
             </table>
           </div>
         )}
+        {/* Tags Tab */}
+        {tab === 'tags' && (
+          <div className="space-y-6">
+            {/* Add form */}
+            <div className="bg-white rounded-lg shadow-sm border p-4 flex gap-3 items-end">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">类型</label>
+                <select
+                  value={newTagType}
+                  onChange={e => setNewTagType(e.target.value)}
+                  className="border rounded px-2 py-1.5 text-sm"
+                >
+                  {TAG_TYPES.map(t => <option key={t} value={t}>{TAG_TYPE_LABELS[t]}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">标签名</label>
+                <input
+                  value={newTagName}
+                  onChange={e => setNewTagName(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && addTag()}
+                  placeholder="如：促销"
+                  className="border rounded px-2 py-1.5 text-sm w-32"
+                />
+              </div>
+              <button
+                onClick={addTag}
+                className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+              >
+                添加
+              </button>
+            </div>
+
+            {/* Grouped tag lists */}
+            {TAG_TYPES.map(type => (
+              <div key={type} className="bg-white rounded-lg shadow-sm border overflow-hidden">
+                <div className="px-4 py-2 bg-gray-50 border-b text-sm font-medium text-gray-700">
+                  {TAG_TYPE_LABELS[type]}
+                </div>
+                {(tags[type] ?? []).length === 0 ? (
+                  <p className="px-4 py-3 text-sm text-gray-400">暂无标签</p>
+                ) : (
+                  <div className="px-4 py-3 flex flex-wrap gap-2">
+                    {(tags[type] ?? []).map(tag => (
+                      <span key={tag.id} className="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded text-sm">
+                        {tag.name}
+                        {tag._count.scripts > 0 && (
+                          <span className="text-xs text-gray-400">({tag._count.scripts})</span>
+                        )}
+                        <button
+                          onClick={() => deleteTag(tag.id)}
+                          className="text-gray-400 hover:text-red-500 ml-1 text-xs"
+                          title={tag._count.scripts > 0 ? '有关联脚本，无法删除' : '删除'}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
       </div>
     </div>
   )
